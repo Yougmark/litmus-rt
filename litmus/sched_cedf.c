@@ -101,15 +101,18 @@ typedef struct clusterdomain {
 /* a cedf_domain per cluster; allocation is done at init/activation time */
 cedf_domain_t *cedf;
 
+static rt_domain_t cedf_master;
+#define cluster_master_lock (cedf_master.ready_lock)
+
 #define remote_cluster(cpu)	((cedf_domain_t *) per_cpu(cedf_cpu_entries, cpu).cluster)
 #define task_cpu_cluster(task)	remote_cluster(get_partition(task))
 
 /* Uncomment WANT_ALL_SCHED_EVENTS if you want to see all scheduling
  * decisions in the TRACE() log; uncomment VERBOSE_INIT for verbose
  * information during the initialization of the plugin (e.g., topology)
-#define WANT_ALL_SCHED_EVENTS
  */
 #define VERBOSE_INIT
+#define WANT_ALL_SCHED_EVENTS
 
 static int cpu_lower_prio(struct bheap_node *_a, struct bheap_node *_b)
 {
@@ -347,12 +350,12 @@ static void cedf_release_jobs(rt_domain_t* rt, struct bheap* tasks)
 	cedf_domain_t* cluster = container_of(rt, cedf_domain_t, domain);
 	unsigned long flags;
 
-	raw_spin_lock_irqsave(&cluster->cluster_lock, flags);
+	raw_spin_lock_irqsave(&cluster_master_lock, flags);
 
 	__merge_ready(&cluster->domain, tasks);
 	check_for_preemptions(cluster);
 
-	raw_spin_unlock_irqrestore(&cluster->cluster_lock, flags);
+	raw_spin_unlock_irqrestore(&cluster_master_lock, flags);
 }
 
 /* caller holds cedf_lock */
@@ -416,7 +419,7 @@ static struct task_struct* cedf_schedule(struct task_struct * prev)
 	}
 #endif
 
-	raw_spin_lock(&cluster->cluster_lock);
+	raw_spin_lock(&cluster_master_lock);
 
 	/* sanity checking */
 	BUG_ON(entry->scheduled && entry->scheduled != prev);
@@ -498,7 +501,7 @@ static struct task_struct* cedf_schedule(struct task_struct * prev)
 			next = prev;
 
 	sched_state_task_picked();
-	raw_spin_unlock(&cluster->cluster_lock);
+	raw_spin_unlock(&cluster_master_lock);
 
 #ifdef WANT_ALL_SCHED_EVENTS
 	TRACE("cedf_lock released, next=0x%p\n", next);
@@ -535,12 +538,12 @@ static void cedf_task_new(struct task_struct * t, int on_rq, int is_scheduled)
 	cpu_entry_t* 		entry;
 	cedf_domain_t*		cluster;
 
-	TRACE("gsn edf: task new %d\n", t->pid);
+	TRACE("cluster edf: task new %d\n", t->pid);
 
 	/* the cluster doesn't change even if t is scheduled */
 	cluster = task_cpu_cluster(t);
 
-	raw_spin_lock_irqsave(&cluster->cluster_lock, flags);
+	raw_spin_lock_irqsave(&cluster_master_lock, flags);
 
 	/* setup job params */
 	release_at(t, litmus_clock());
@@ -568,7 +571,7 @@ static void cedf_task_new(struct task_struct * t, int on_rq, int is_scheduled)
 
 	if (on_rq || is_scheduled)
 		cedf_job_arrival(t);
-	raw_spin_unlock_irqrestore(&(cluster->cluster_lock), flags);
+	raw_spin_unlock_irqrestore(&(cluster_master_lock), flags);
 }
 
 static void cedf_task_wake_up(struct task_struct *task)
@@ -581,13 +584,13 @@ static void cedf_task_wake_up(struct task_struct *task)
 
 	cluster = task_cpu_cluster(task);
 
-	raw_spin_lock_irqsave(&cluster->cluster_lock, flags);
+	raw_spin_lock_irqsave(&cluster_master_lock, flags);
 	now = litmus_clock();
 	if (is_sporadic(task) && is_tardy(task, now)) {
 		inferred_sporadic_job_release_at(task, now);
 	}
 	cedf_job_arrival(task);
-	raw_spin_unlock_irqrestore(&cluster->cluster_lock, flags);
+	raw_spin_unlock_irqrestore(&cluster_master_lock, flags);
 }
 
 static void cedf_task_block(struct task_struct *t)
@@ -600,9 +603,9 @@ static void cedf_task_block(struct task_struct *t)
 	cluster = task_cpu_cluster(t);
 
 	/* unlink if necessary */
-	raw_spin_lock_irqsave(&cluster->cluster_lock, flags);
+	raw_spin_lock_irqsave(&cluster_master_lock, flags);
 	unlink(t);
-	raw_spin_unlock_irqrestore(&cluster->cluster_lock, flags);
+	raw_spin_unlock_irqrestore(&cluster_master_lock, flags);
 
 	BUG_ON(!is_realtime(t));
 }
@@ -614,7 +617,7 @@ static void cedf_task_exit(struct task_struct * t)
 	cedf_domain_t *cluster = task_cpu_cluster(t);
 
 	/* unlink if necessary */
-	raw_spin_lock_irqsave(&cluster->cluster_lock, flags);
+	raw_spin_lock_irqsave(&cluster_master_lock, flags);
 	unlink(t);
 	if (tsk_rt(t)->scheduled_on != NO_CPU) {
 		cpu_entry_t *cpu;
@@ -622,7 +625,7 @@ static void cedf_task_exit(struct task_struct * t)
 		cpu->scheduled = NULL;
 		tsk_rt(t)->scheduled_on = NO_CPU;
 	}
-	raw_spin_unlock_irqrestore(&cluster->cluster_lock, flags);
+	raw_spin_unlock_irqrestore(&cluster_master_lock, flags);
 
 	BUG_ON(!is_realtime(t));
         TRACE_TASK(t, "RIP\n");
@@ -778,6 +781,8 @@ static long cedf_activate_plugin(void)
 		cedf[i].domain.release_master = atomic_read(&release_master_cpu);
 #endif
 	}
+    /* only use cedf_master's lock */
+    edf_domain_init(&cedf_master, NULL, cedf_release_jobs);
 
 	/* cycle through cluster and add cpus to them */
 	for (i = 0; i < num_clusters; i++) {
