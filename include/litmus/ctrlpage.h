@@ -74,6 +74,8 @@ typedef enum {
 	LRT_wait_for_ts_release,
 	LRT_release_ts,
 	LRT_get_current_budget,
+	LRT_get_current_deadline,
+	LRT_set_current_deadline,
 } litmus_syscall_id_t;
 
 union litmus_syscall_args {
@@ -98,6 +100,14 @@ union litmus_syscall_args {
 		lt_t __user *expended;
 		lt_t __user *remaining;
 	} get_current_budget;
+
+	struct {
+		lt_t __user *deadline;
+	} get_current_deadline;
+
+	struct {
+		lt_t deadline;
+	} set_current_deadline;
 };
 
 

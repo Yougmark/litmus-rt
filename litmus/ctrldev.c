@@ -134,6 +134,8 @@ asmlinkage long sys_litmus_unlock(int lock_od);
 asmlinkage long sys_wait_for_job_release(unsigned int job);
 asmlinkage long sys_wait_for_ts_release(void);
 asmlinkage long sys_release_ts(lt_t __user *__when);
+asmlinkage long sys_get_current_deadline(lt_t __user *deadline);
+asmlinkage long sys_set_current_deadline(lt_t deadline);
 
 static long litmus_ctrl_ioctl(struct file *filp,
 	unsigned int cmd, unsigned long arg)
@@ -211,6 +213,20 @@ static long litmus_ctrl_ioctl(struct file *filp,
 
 	case LRT_release_ts:
 		return sys_release_ts((lt_t __user *) arg);
+
+	case LRT_get_current_deadline:
+		if (copy_from_user(&syscall_args, (void *) arg, sizeof(syscall_args)) != 0) {
+			return -EINVAL;
+		}
+		return sys_get_current_deadline(
+			syscall_args.get_current_deadline.deadline);
+
+	case LRT_set_current_deadline:
+		if (copy_from_user(&syscall_args, (void *) arg, sizeof(syscall_args)) != 0) {
+			return -EINVAL;
+		}
+		return sys_set_current_deadline(
+			syscall_args.set_current_deadline.deadline);
 
 	default:
 		printk(KERN_DEBUG "ctrldev: strange ioctl (%u, %lu)\n", cmd, arg);

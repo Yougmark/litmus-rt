@@ -208,6 +208,34 @@ asmlinkage long sys_get_rt_task_param(pid_t pid, struct rt_task __user * param)
 }
 
 /*
+ *	This is experimental and only used for the C-FL and G-FL in special
+ *	jobs.
+ */
+asmlinkage long sys_get_current_deadline(lt_t __user *deadline)
+{
+	lt_t current_deadline = get_deadline(current);
+	if (!is_realtime(current)) {
+		return -EINVAL;
+	}
+	if (copy_to_user(deadline, &current_deadline, sizeof(current_deadline)) != 0) {
+		return -EFAULT;
+	}
+	return 0;
+}
+
+/*
+ *	Like sys_get_current_deadline, but much more dangerous.
+ */
+asmlinkage long sys_set_current_deadline(lt_t deadline)
+{
+	if (!is_realtime(current)) {
+		return -EINVAL;
+	}
+	tsk_rt(current)->job_params.deadline = deadline;
+	return 0;
+}
+
+/*
  *	This is the crucial function for periodic task implementation,
  *	It checks if a task is periodic, checks if such kind of sleep
  *	is permitted and calls plugin-specific sleep, which puts the
