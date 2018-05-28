@@ -22,7 +22,7 @@ int __percpu_init_rwsem(struct percpu_rw_semaphore *sem,
 	sem->readers_block = 0;
 	return 0;
 }
-EXPORT_SYMBOL_GPL(__percpu_init_rwsem);
+EXPORT_SYMBOL(__percpu_init_rwsem);
 
 void percpu_free_rwsem(struct percpu_rw_semaphore *sem)
 {
@@ -37,7 +37,7 @@ void percpu_free_rwsem(struct percpu_rw_semaphore *sem)
 	free_percpu(sem->read_count);
 	sem->read_count = NULL; /* catch use after free bugs */
 }
-EXPORT_SYMBOL_GPL(percpu_free_rwsem);
+EXPORT_SYMBOL(percpu_free_rwsem);
 
 int __percpu_down_read(struct percpu_rw_semaphore *sem, int try)
 {
@@ -90,7 +90,7 @@ int __percpu_down_read(struct percpu_rw_semaphore *sem, int try)
 	preempt_disable();
 	return 1;
 }
-EXPORT_SYMBOL_GPL(__percpu_down_read);
+EXPORT_SYMBOL(__percpu_down_read);
 
 void __percpu_up_read(struct percpu_rw_semaphore *sem)
 {
@@ -105,7 +105,7 @@ void __percpu_up_read(struct percpu_rw_semaphore *sem)
 	/* Prod writer to recheck readers_active */
 	wake_up(&sem->writer);
 }
-EXPORT_SYMBOL_GPL(__percpu_up_read);
+EXPORT_SYMBOL(__percpu_up_read);
 
 #define per_cpu_sum(var)						\
 ({									\
@@ -162,7 +162,7 @@ void percpu_down_write(struct percpu_rw_semaphore *sem)
 	/* Wait for all now active readers to complete. */
 	wait_event(sem->writer, readers_active_check(sem));
 }
-EXPORT_SYMBOL_GPL(percpu_down_write);
+EXPORT_SYMBOL(percpu_down_write);
 
 void percpu_up_write(struct percpu_rw_semaphore *sem)
 {
@@ -190,4 +190,4 @@ void percpu_up_write(struct percpu_rw_semaphore *sem)
 	 */
 	rcu_sync_exit(&sem->rss);
 }
-EXPORT_SYMBOL_GPL(percpu_up_write);
+EXPORT_SYMBOL(percpu_up_write);

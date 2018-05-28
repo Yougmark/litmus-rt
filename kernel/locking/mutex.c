@@ -106,6 +106,14 @@ void __sched mutex_lock(struct mutex *lock)
 }
 
 EXPORT_SYMBOL(mutex_lock);
+#else
+#undef mutex_lock
+__visible void __sched mutex_lock(struct mutex *lock)
+{
+	mutex_lock_nested(lock, 0);
+}
+EXPORT_SYMBOL(mutex_lock);
+#define mutex_lock(lock) mutex_lock_nested(lock, 0)
 #endif
 
 static __always_inline void ww_mutex_lock_acquired(struct ww_mutex *ww,
@@ -624,7 +632,7 @@ mutex_lock_nested(struct mutex *lock, unsigned int subclass)
 			    subclass, NULL, _RET_IP_, NULL, 0);
 }
 
-EXPORT_SYMBOL_GPL(mutex_lock_nested);
+EXPORT_SYMBOL(mutex_lock_nested);
 
 void __sched
 _mutex_lock_nest_lock(struct mutex *lock, struct lockdep_map *nest)
@@ -634,7 +642,7 @@ _mutex_lock_nest_lock(struct mutex *lock, struct lockdep_map *nest)
 			    0, nest, _RET_IP_, NULL, 0);
 }
 
-EXPORT_SYMBOL_GPL(_mutex_lock_nest_lock);
+EXPORT_SYMBOL(_mutex_lock_nest_lock);
 
 int __sched
 mutex_lock_killable_nested(struct mutex *lock, unsigned int subclass)
@@ -643,7 +651,7 @@ mutex_lock_killable_nested(struct mutex *lock, unsigned int subclass)
 	return __mutex_lock_common(lock, TASK_KILLABLE,
 				   subclass, NULL, _RET_IP_, NULL, 0);
 }
-EXPORT_SYMBOL_GPL(mutex_lock_killable_nested);
+EXPORT_SYMBOL(mutex_lock_killable_nested);
 
 int __sched
 mutex_lock_interruptible_nested(struct mutex *lock, unsigned int subclass)
@@ -653,7 +661,7 @@ mutex_lock_interruptible_nested(struct mutex *lock, unsigned int subclass)
 				   subclass, NULL, _RET_IP_, NULL, 0);
 }
 
-EXPORT_SYMBOL_GPL(mutex_lock_interruptible_nested);
+EXPORT_SYMBOL(mutex_lock_interruptible_nested);
 
 static inline int
 ww_mutex_deadlock_injection(struct ww_mutex *lock, struct ww_acquire_ctx *ctx)
@@ -694,7 +702,7 @@ __ww_mutex_lock(struct ww_mutex *lock, struct ww_acquire_ctx *ctx)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(__ww_mutex_lock);
+EXPORT_SYMBOL(__ww_mutex_lock);
 
 int __sched
 __ww_mutex_lock_interruptible(struct ww_mutex *lock, struct ww_acquire_ctx *ctx)
@@ -710,7 +718,7 @@ __ww_mutex_lock_interruptible(struct ww_mutex *lock, struct ww_acquire_ctx *ctx)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(__ww_mutex_lock_interruptible);
+EXPORT_SYMBOL(__ww_mutex_lock_interruptible);
 
 #endif
 
